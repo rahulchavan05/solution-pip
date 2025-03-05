@@ -16,9 +16,7 @@ jobs:
 
     env:
       Solution_Name: Test.sln  # Ensure this is correct
-      Test_Project_Path: Test/Test/Test.csproj  
-      Wap_Project_Directory: Test  
-      Wap_Project_Path: Test/Test.wapproj  # Correct this to your actual WAP project path
+      Test_Project_Path: Test/Test/Test.csproj  # Ensure this is the correct path
 
     steps:
     - name: Checkout Code
@@ -29,39 +27,23 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 6.0.x  # Ensure this version is compatible
+        dotnet-version: 4.7.2  # Change this based on your project's .NET version
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
+    - name: Verify Solution File Exists
+      run: |
+        if (!(Test-Path "$env:Solution_Name")) {
+          Write-Host "Error: Solution file not found: $env:Solution_Name"
+          exit 1
+        }
+
     - name: Restore Dependencies
-      run: dotnet restore
+      run: dotnet restore $env:Solution_Name
 
     - name: Build Solution
-      run: msbuild $env:Solution_Name /p:Configuration=$env:Configuration
-      env:
-        Configuration: ${{ matrix.configuration }}
+      run: msbuild $env:Solution_Name /p:Configuration=${{ matrix.configuration }}
 
     - name: Run Unit Tests
-      run: dotnet test $env:Test_Project_Path --no-restore --verbosity normal
-
-    - name: Decode Signing Certificate
-      run: |
-        $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.Base64_Encoded_Pfx }}")
-        $certificatePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath GitHubActionsWorkflow.pfx
-        [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
-
-    - name: Package Application
-      run: msbuild $env:Wap_Project_Path /p:Configuration=$env:Configuration /p:UapAppxPackageBuildMode=StoreUpload /p:AppxBundle=Always /p:PackageCertificateKeyFile=GitHubActionsWorkflow.pfx /p:PackageCertificatePassword=${{ secrets.Pfx_Key }}
-      env:
-        Configuration: ${{ matrix.configuration }}
-
-    - name: Remove Certificate
-      run: Remove-Item -path $env:Wap_Project_Directory\GitHubActionsWorkflow.pfx -Force
-
-    - name: Upload Build Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: MSIX Package
-        path: |
-          ${{ env.Wap_Project_Directory }}\AppPackages
+      run: dotnet test $env:Test_Project_Path --no-restore --configuration ${{ matrix.configuration }} --verbosity normal
