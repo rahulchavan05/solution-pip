@@ -17,10 +17,11 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup .NET SDK
+        shell: pwsh
         run: |
           # Extract .NET version from the .csproj file
-          $dotnetVersion = Select-String -Pattern '<TargetFramework>(.*)<\/TargetFramework>' -Path Test/Test/Test.csproj | ForEach-Object { $_.Matches.Groups[1].Value }
-          echo "VERSION DETECTED: $dotnetVersion"
+          $dotnetVersion = Select-String -Pattern '<TargetFramework>([^<]+)<\/TargetFramework>' -Path Test_3/**/*.csproj | ForEach-Object { $_.Matches.Groups[1].Value } | Select-Object -First 1
+          echo "Detected .NET version: $dotnetVersion"
           actions/setup-dotnet@v3
           with:
             dotnet-version: $dotnetVersion
@@ -33,7 +34,7 @@ jobs:
 
       - name: Run unit tests with code coverage
         run: |
-          dotnet test Test/Test.sln -c Release --collect:"Code Coverage"
+          dotnet test Test_3/Test_3.sln -c Release --collect:"Code Coverage"
           dotnet tool install --global dotnet-reportgenerator-globaltool
           dotnet reportgenerator -reports:Test_3/coverage.cobertura.xml -targetdir:Test_3/coverage -reporttypes:Cobertura
 
@@ -46,6 +47,6 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Test_3/Test_3.sln') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Test_3/**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
