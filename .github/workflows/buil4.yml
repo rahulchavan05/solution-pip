@@ -16,15 +16,17 @@ jobs:
       - name: Checkout repository code
         uses: actions/checkout@v3
 
-      - name: Setup .NET SDK
+      - name: Detect .NET version
+        id: detect-dotnet
         shell: pwsh
         run: |
-          # Extract .NET version from the .csproj file
           $dotnetVersion = Select-String -Pattern '<TargetFramework>([^<]+)<\/TargetFramework>' -Path Test_3/**/*.csproj | ForEach-Object { $_.Matches.Groups[1].Value } | Select-Object -First 1
-          echo "Detected .NET version: $dotnetVersion"
-          actions/setup-dotnet@v3
-          with:
-            dotnet-version: $dotnetVersion
+          echo "::set-output name=DOTNET_VERSION::$dotnetVersion"
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ steps.detect-dotnet.outputs.DOTNET_VERSION }}
 
       - name: Restore NuGet packages
         run: dotnet restore Test_3/Test_3.sln
