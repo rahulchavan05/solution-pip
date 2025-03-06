@@ -30,7 +30,7 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore NuGet packages
-        run: dotnet restore Test/Test.sln
+        run: dotnet restore Test_3/Test_3.sln
 
       - name: Build solution with detailed logging
         run: dotnet build Test/Test.sln -c Release -v:diag
