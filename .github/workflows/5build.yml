@@ -1,0 +1,58 @@
+name: .NET Solution Build and Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+
+      - name: Detect .NET version
+        id: detect-dotnet
+        shell: pwsh
+        run: |
+          $dotnetVersion = Select-String -Pattern '<TargetFramework>([^<]+)<\/TargetFramework>' -Path Test_3/**/*.csproj | ForEach-Object { $_.Matches.Groups[1].Value } | Select-Object -First 1
+          echo "::set-output name=DOTNET_VERSION::$dotnetVersion"
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ steps.detect-dotnet.outputs.DOTNET_VERSION }}
+
+      - name: Restore NuGet packages
+        run: dotnet restore Test_3/Test_3.sln
+
+      - name: Build solution with detailed logging
+        run: dotnet build Test_3/Test_3.sln -c Release -v:diag
+
+      - name: Run unit tests with code coverage
+        run: dotnet test Test_3/Test_3.sln -c Release --collect:"Code Coverage"
+
+      - name: Install the ReportGenerator tool
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+        shell: pwsh
+
+      - name: Add .NET Tools to PATH
+        shell: pwsh
+        run: echo "::add-path::$([System.Environment]::GetFolderPath('UserProfile') + '\.dotnet\tools')"
+
+      - name: Generate test reports
+        run: reportgenerator -reports:Test_3/coverage.cobertura.xml -targetdir:Test_3/coverage -reporttypes:Html
+        shell: pwsh
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v3
+        with:
+          path: ~/nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Test_3/**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
