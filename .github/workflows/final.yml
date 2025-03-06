@@ -1,0 +1,47 @@
+name: final
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+
+      - name: Find Solution File
+        id: find-solution
+        shell: pwsh
+        run: |
+          $solutionPath = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
+          if (-Not $solutionPath) {
+            Write-Host "Error: No solution file (.sln) found"
+            exit 1
+          }
+          echo "Found solution file at: $solutionPath"
+          echo "SOLUTION_PATH=$solutionPath" >> $env:GITHUB_ENV
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '6.0.x' # Or dynamically detect as discussed previously
+
+      - name: Restore NuGet packages
+        run: dotnet restore "${{ env.SOLUTION_PATH }}"
+
+      - name: Build solution with detailed logging
+        run: dotnet build "${{ env.SOLUTION_PATH }}" -c Release -v:diag
+
+      - name: Run unit tests with code coverage
+        run: dotnet test "${{ env.SOLUTION_PATH }}" -c Release --collect:"Code Coverage"
+
+      - name: Install the ReportGenerator tool
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+        shell: pwsh
