@@ -1,0 +1,35 @@
+name: Build Solution
+
+
+
+on:
+
+  push:
+
+    branches: [ main ]
+
+
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+
+        run: | 
+
+          dotnet restore
+
+      - name: Build solution
+
+        run: dotnet build
+
+      - name: Run tests
+
+        run: dotnet test
