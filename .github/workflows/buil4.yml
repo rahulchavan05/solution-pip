@@ -1,0 +1,51 @@
+name: .NET Solution Build and Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+
+      - name: Setup .NET SDK
+        run: |
+          # Extract .NET version from the .csproj file
+          $dotnetVersion = Select-String -Pattern '<TargetFramework>(.*)<\/TargetFramework>' -Path Test/Test/Test.csproj | ForEach-Object { $_.Matches.Groups[1].Value }
+          echo "VERSION DETECTED: $dotnetVersion"
+          actions/setup-dotnet@v3
+          with:
+            dotnet-version: $dotnetVersion
+
+      - name: Restore NuGet packages
+        run: dotnet restore Test_3/Test_3.sln
+
+      - name: Build solution with detailed logging
+        run: dotnet build Test_3/Test_3.sln -c Release -v:diag
+
+      - name: Run unit tests with code coverage
+        run: |
+          dotnet test Test/Test.sln -c Release --collect:"Code Coverage"
+          dotnet tool install --global dotnet-reportgenerator-globaltool
+          dotnet reportgenerator -reports:Test_3/coverage.cobertura.xml -targetdir:Test_3/coverage -reporttypes:Cobertura
+
+      - name: Generate test reports (optional)
+        run: |
+          dotnet reportgenerator -reports:Test_3/coverage.cobertura.xml -targetdir:Test_3/coverage -reporttypes:Html
+          dotnet reportgenerator -reports:Test_3/coverage.cobertura.xml -targetdir:Test_3/coverage -reporttypes:Xml
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v3
+        with:
+          path: ~/nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Test_3/Test_3.sln') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
