@@ -32,7 +32,7 @@ jobs:
         run: dotnet restore Test_3/Test_3.sln
 
       - name: Build solution with detailed logging
-        run: dotnet build Test_3/Test_3.sln -c Release -v:diag
+        run: dotnet build Test_3/Test_3.sln -c Release
 
       - name: Run unit tests with code coverage
         run: |
