@@ -1,4 +1,4 @@
-name: final
+name: build_and_push_changes_to_repo
 
 on:
   push:
@@ -37,6 +37,7 @@ jobs:
           if (Test-Path $jsonPath) {
             $jsonContent = Get-Content $jsonPath | ConvertFrom-Json
             
+            # Extract and increment the version
             $currentVersion = $jsonContent.version -split "\."
             $major = [int]$currentVersion[0]
             $minor = [int]$currentVersion[1]
@@ -45,6 +46,7 @@ jobs:
             $newVersion = "$major.$minor.$patch"
             $jsonContent.version = $newVersion
 
+            # Save the updated JSON
             $jsonContent | ConvertTo-Json -Depth 10 | Set-Content $jsonPath
 
             Write-Host "Updated version to: $newVersion"
@@ -57,8 +59,11 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+          
+          git pull --rebase https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/rahulchavan05/solution-pip.git main
+          
           git add version.json
-          git commit -m "Increment version in version.json"
+          git commit -m "Increment version in version.json" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/rahulchavan05/solution-pip.git HEAD:main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,10 +77,10 @@ jobs:
       - name: Restore NuGet packages
         run: dotnet restore "${{ env.SOLUTION_PATH }}"
 
-      - name: Build solution with detailed logging
-        run: dotnet build "${{ env.SOLUTION_PATH }}" -c Release -v:diag
+      - name: Build solution
+        run: dotnet build "${{ env.SOLUTION_PATH }}" -c Release
 
-      - name: Run unit tests with code coverage
+      - name: Run unit tests
         run: dotnet test "${{ env.SOLUTION_PATH }}" -c Release --collect:"Code Coverage"
 
       - name: Install the ReportGenerator tool
@@ -86,8 +91,15 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+          
+          # Pull latest changes to avoid conflicts
+          git pull --rebase https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/rahulchavan05/solution-pip.git main
+
+          # Add build output files
           git add **/bin/Release/*
-          git commit -m "Add build output files"
+          git commit -m "Add build output files" || echo "No changes to commit"
+
+          # Push changes
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/rahulchavan05/solution-pip.git HEAD:main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
