@@ -1,0 +1,94 @@
+name: final
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Find Solution File
+        id: find-solution
+        shell: pwsh
+        run: |
+          $solutionPath = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
+          if (-Not $solutionPath) {
+            Write-Host "Error: No solution file (.sln) found"
+            exit 1
+          }
+          echo "Found solution file at: $solutionPath"
+          echo "SOLUTION_PATH=$solutionPath" >> $env:GITHUB_ENV
+
+      - name: Update version.json for version control
+        shell: pwsh
+        run: |
+          $jsonPath = "version.json"
+          if (Test-Path $jsonPath) {
+            $jsonContent = Get-Content $jsonPath | ConvertFrom-Json
+            
+            $currentVersion = $jsonContent.version -split "\."
+            $major = [int]$currentVersion[0]
+            $minor = [int]$currentVersion[1]
+            $patch = [int]$currentVersion[2] + 1  # Increment patch version
+
+            $newVersion = "$major.$minor.$patch"
+            $jsonContent.version = $newVersion
+
+            $jsonContent | ConvertTo-Json -Depth 10 | Set-Content $jsonPath
+
+            Write-Host "Updated version to: $newVersion"
+          } else {
+            Write-Host "Error: version.json not found"
+            exit 1
+          }
+
+      - name: Commit and push version.json update
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add version.json
+          git commit -m "Increment version in version.json"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/rahulchavan05/solution-pip.git HEAD:main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Restore NuGet packages
+        run: dotnet restore "${{ env.SOLUTION_PATH }}"
+
+      - name: Build solution with detailed logging
+        run: dotnet build "${{ env.SOLUTION_PATH }}" -c Release -v:diag
+
+      - name: Run unit tests with code coverage
+        run: dotnet test "${{ env.SOLUTION_PATH }}" -c Release --collect:"Code Coverage"
+
+      - name: Install the ReportGenerator tool
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+        shell: pwsh
+
+      - name: Commit and push build output
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add **/bin/Release/*
+          git commit -m "Add build output files"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/rahulchavan05/solution-pip.git HEAD:main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
