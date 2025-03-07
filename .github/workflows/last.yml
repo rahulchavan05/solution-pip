@@ -30,7 +30,6 @@ jobs:
           echo "Found solution file at: $solutionPath"
           echo "SOLUTION_PATH=$solutionPath" >> $env:GITHUB_ENV
 
-      # ✅ Move the version.json update step before build & test
       - name: Update version.json for version control
         shell: pwsh
         run: |
@@ -38,10 +37,13 @@ jobs:
           if (Test-Path $jsonPath) {
             $jsonContent = Get-Content $jsonPath | ConvertFrom-Json
             
-            # Ensure the publicReleaseRefSpec includes the additional stage
-            if ($jsonContent.publicReleaseRefSpec -notcontains "^refs/heads/new-stage$") {
-              $jsonContent.publicReleaseRefSpec += "^refs/heads/new-stage$"
-            }
+            $currentVersion = $jsonContent.version -split "\."
+            $major = [int]$currentVersion[0]
+            $minor = [int]$currentVersion[1]
+            $patch = [int]$currentVersion[2] + 1  # Increment patch version
+            
+            $newVersion = "$major.$minor.$patch"
+            $jsonContent.version = $newVersion
             
             # Save the updated JSON
             $jsonContent | ConvertTo-Json -Depth 10 | Set-Content $jsonPath
